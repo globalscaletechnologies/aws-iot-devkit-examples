@@ -1,0 +1,207 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "Creates aws iot thing and related policies",
+
+  "Parameters": {
+    "IoTSensorDSN": {
+      "Description": "The device serial number (DSN) of the AWS IoT Sensor. This DSN should be the mac address exclude ':'. The mac address can be found on the back of the device.",
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{12}",
+      "ConstraintDescription" : "must be a valid IoTSensorDSN."
+    },
+    "IoTSensorType": {
+      "Description": "Sensor type, ht: for Si7021, lu: for APDS-9301, pt: for BMP180",
+      "Type": "String",
+      "Default": "ht",
+      "AllowedValues": [
+        "ht",
+        "lu",
+        "pt"
+      ],
+      "ConstraintDescription" : "must be a valid Iot Sensor type."
+    },
+    "CertificateARN": {
+      "Type": "String",
+      "Description": "The Amazon Resource Name (ARN) of the existing AWS IoT certificate."
+    }
+  },
+
+  "Resources" : {
+    "IoTThing": {
+      "Type": "AWS::IoT::Thing",
+      "Properties": {
+        "ThingName": {
+          "Fn::Join": [ "", [ "sensor-", { "Ref": "IoTSensorType" }, "-", { "Ref": "IoTSensorDSN" } ]]
+        }
+      }
+    },
+
+    "IoTPolicy": {
+      "Type": "AWS::IoT::Policy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Join": [ "", [ { "Ref": "IoTThing" }, "-", "policy" ]]
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "iot:Connect",
+              "Resource": {
+                "Fn::Join": [ "", [ "arn:aws:iot:", { "Ref": "AWS::Region" }, ":", { "Ref": "AWS::AccountId" }, ":*" ]]
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": "iot:Publish",
+              "Resource": {
+                "Fn::Join": [ "", [ "arn:aws:iot:", { "Ref": "AWS::Region" }, ":", { "Ref": "AWS::AccountId" }, ":*" ]]
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": "iot:Subscribe",
+              "Resource": {
+                "Fn::Join": [ "", [ "arn:aws:iot:", { "Ref": "AWS::Region" }, ":", { "Ref": "AWS::AccountId" }, ":*" ]]
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": "iot:Receive",
+              "Resource": {
+                "Fn::Join": [ "", [ "arn:aws:iot:", { "Ref": "AWS::Region" }, ":", { "Ref": "AWS::AccountId" }, ":*" ]]
+              }
+            }
+          ]
+        }
+      }
+    },
+
+    "IoTPolicyPrincipalAttachment": {
+      "Type": "AWS::IoT::PolicyPrincipalAttachment",
+      "Properties": {
+        "PolicyName": {
+          "Ref": "IoTPolicy"
+        },
+        "Principal": {
+          "Ref": "CertificateARN"
+        }
+      }
+    },
+
+    "IoTThingPrincipalAttachment": {
+      "Type" : "AWS::IoT::ThingPrincipalAttachment",
+      "Properties": {
+        "Principal": {
+          "Ref": "CertificateARN"
+        },
+        "ThingName": {
+          "Ref": "IoTThing"
+        }
+      }
+    },
+
+    "IoTPublishRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Join": [ "", [ "IoTPublishRole_", { "Ref": "IoTSensorDSN" } ]]
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "iot.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/service-role/",
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "iot:Publish",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:iot:",
+                        { "Ref": "AWS::Region" },
+                        ":",
+                        { "Ref": "AWS::AccountId" },
+                        ":topic/$aws/things/",
+                        { "Ref": "IoTThing" },
+                        "/shadow/update"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            },
+            "PolicyName": {
+              "Fn::Join": [ "", [ "IoTPublishRolePolicy_", { "Ref": "IoTSensorType" }, "_", { "Ref": "IoTSensorDSN" } ]]
+            }
+          }
+        ]
+      }
+    },
+
+    "IoTTopicRule": {
+      "Type": "AWS::IoT::TopicRule",
+      "Properties": {
+        "RuleName": {
+          "Fn::Join": [ "", [ "sensor_", { "Ref": "IoTSensorType" }, "_", { "Ref": "IoTSensorDSN" }, "_lwt_republish" ]]
+        },
+        "TopicRulePayload": {
+          "Description": "IoT sensor LWT republish rule",
+          "Actions": [
+            {
+              "Republish": {
+                "Qos": 0,
+                "RoleArn": {
+                  "Fn::GetAtt": [
+                    "IoTPublishRole",
+                    "Arn"
+                  ]
+                },
+                "Topic": {
+                  "Fn::Join": [ "", [ "$$aws/things/", { "Ref": "IoTThing" }, "/shadow/update" ]]
+                }
+              }
+            }
+          ],
+          "AwsIotSqlVersion": "2015-10-08",
+          "RuleDisabled": false,
+          "Sql": {
+            "Fn::Join": [
+              "",
+              [
+                "SELECT * FROM 'iot-sensor-demo/",
+                {
+                  "Ref": "IoTThing"
+                },
+                "/update'"
+              ]
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "Outputs" : {
+    "Thing" : {
+      "Description" : "IoT device thing name",
+      "Value" : { "Fn::Join" : ["", [ { "Ref" : "IoTThing" } ]] }
+    }
+  }
+}

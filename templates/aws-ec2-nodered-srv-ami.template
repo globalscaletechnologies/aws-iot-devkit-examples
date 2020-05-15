@@ -1,0 +1,205 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "Creates an Amazon EC2 instance and install Node-Red service",
+
+  "Parameters" : {
+    "KeyName": {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "Can contain only ASCII characters."
+    },
+    "InstanceType" : {
+      "Description" : "WebServer EC2 instance type",
+      "Type" : "String",
+      "Default" : "t2.micro",
+      "AllowedValues" : [
+        "t1.micro",
+        "t2.nano",
+        "t2.micro",
+        "t2.small",
+        "t2.medium",
+        "t2.large"
+      ],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+    "SSHLocation" : {
+      "Description" : "The IP address range that can be used to SSH to the EC2 instances",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x"
+    },
+    "NodeRedUsername": {
+      "Type": "String",
+      "Description": "Node-red username",
+      "Default": "admin"
+    },
+    "NodeRedPassHash": {
+      "Type": "String",
+      "Description": "Node-red hashed password",
+      "Default": "$2a$08$lB.AkcFsy6KLSsRl0Ruvw.62HtjAAhVGK4sTbgUgpCH3M.mA229wG"
+    }
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "HVM64" },
+      "t2.nano"     : { "Arch" : "HVM64" },
+      "t2.micro"    : { "Arch" : "HVM64" },
+      "t2.small"    : { "Arch" : "HVM64" },
+      "t2.medium"   : { "Arch" : "HVM64" },
+      "t2.large"    : { "Arch" : "HVM64" }
+    },
+    "AWSRegionArch2AMI" : {
+      "us-east-1"        : {"HVM64" : "ami-0ff8a91507f77f867"},
+      "us-west-2"        : {"HVM64" : "ami-a0cfeed8"},
+      "us-west-1"        : {"HVM64" : "ami-0bdb828fd58c52235"},
+      "eu-west-1"        : {"HVM64" : "ami-047bb4163c506cd98"},
+      "eu-west-2"        : {"HVM64" : "ami-f976839e"},
+      "eu-west-3"        : {"HVM64" : "ami-0ebc281c20e89ba4b"},
+      "eu-central-1"     : {"HVM64" : "ami-0233214e13e500f77"},
+      "ap-northeast-1"   : {"HVM64" : "ami-06cd52961ce9f0d85"},
+      "ap-northeast-2"   : {"HVM64" : "ami-0a10b2721688ce9d2"},
+      "ap-northeast-3"   : {"HVM64" : "ami-0d98120a9fb693f07"},
+      "ap-southeast-1"   : {"HVM64" : "ami-08569b978cc4dfa10"},
+      "ap-southeast-2"   : {"HVM64" : "ami-09b42976632b27e9b"},
+      "ap-south-1"       : {"HVM64" : "ami-0912f71e06545ad88"},
+      "us-east-2"        : {"HVM64" : "ami-0b59bfac6be064b78"},
+      "ca-central-1"     : {"HVM64" : "ami-0b18956f"},
+      "sa-east-1"        : {"HVM64" : "ami-07b14488da8ea02a0"},
+      "cn-north-1"       : {"HVM64" : "ami-0a4eaf6c4454eda75"},
+      "cn-northwest-1"   : {"HVM64" : "ami-6b6a7d09"}
+    }
+  },
+
+  "Resources" : {
+    "NodeRedServerInstance": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "configSets" : {
+            "InstallAndRun" : [ "Configure" ]
+          },
+
+          "Configure" : {
+            "files": {
+              "/home/ec2-user/new-settings.js" : {
+                "content" : { "Fn::Join" : [ "", [
+                "module.exports = {\n",
+                "    uiPort: process.env.PORT || 1880,\n",
+                "    mqttReconnectTime: 15000,\n",
+                "    serialReconnectTime: 15000,\n",
+                "    debugMaxLength: 1000,\n",
+                "    flowFile: 'flows.json',\n",
+                "    functionGlobalContext: {\n",
+                "    },\n",
+                "    exportGlobalContextKeys: false,\n",
+                "    logging: {\n",
+                "        console: {\n",
+                "            level: \"info\",\n",
+                "            metrics: false,\n",
+                "            audit: false\n",
+                "        }\n",
+                "    },\n",
+                "    adminAuth: {\n",
+                "        type: \"credentials\",\n",
+                "        users: [{\n",
+                "            username: \"", {"Ref" : "NodeRedUsername"}, "\",\n",
+                "            password: \"", {"Ref" : "NodeRedPassHash"}, "\",\n",
+                "            permissions: \"*\"\n",
+                "        }]\n",
+                "    },\n",
+                "    editorTheme: {\n",
+                "        projects: {\n",
+                "            enabled: false\n",
+                "        }\n",
+                "    }\n",
+                "}\n"
+                ]]},
+                "mode": "000644",
+                "owner": "ec2-user",
+                "group": "ec2-user"
+              }
+            },
+            "commands": {
+              "0_start_node_red": {
+                "command": "runuser -l ec2-user -c 'pm2 start node-red -- -s /home/ec2-user/new-settings.js -v'"
+              },
+              "1_save_pm2": {
+                "command": "runuser -l ec2-user -c 'pm2 save'"
+              },
+              "2_startup_pm2": {
+                "command": "runuser -l ec2-user -c 'sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemv -u ec2-user --hp /home/ec2-user'"
+              },
+              "3_create_certs_dir" : {
+                "command" : "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/.node-red/certs'"
+              }
+            }
+          }
+        }
+      },
+
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "InstanceType"   : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ {"Ref" : "NodeRedServerSecurityGroup"} ],
+        "KeyName"        : { "Ref" : "KeyName" },
+        "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+             "#!/bin/bash -xe\n",
+             "yum update -y\n",
+             "curl -sL https://rpm.nodesource.com/setup_10.x | bash -\n",
+             "yum install -y nodejs\n",
+             "npm install -g --unsafe-perm node-red\n",
+             "npm install -g --unsafe-perm node-red-dashboard\n",
+             "npm install -g --unsafe-perm node-red-contrib-aws-iot-hub\n",
+             "npm install -g pm2\n",
+
+             "# Install the files and packages from the metadata\n",
+             "/opt/aws/bin/cfn-init -v ",
+             "         --stack ", { "Ref" : "AWS::StackName" },
+             "         --resource NodeRedServerInstance ",
+             "         --configsets InstallAndRun ",
+             "         --region ", { "Ref" : "AWS::Region" }, "\n",
+
+             "# Signal the status from cfn-init\n",
+             "/opt/aws/bin/cfn-signal -e $? ",
+             "         --stack ", { "Ref" : "AWS::StackName" },
+             "         --resource NodeRedServerInstance ",
+             "         --region ", { "Ref" : "AWS::Region" }, "\n"
+        ]]}}
+      },
+
+      "CreationPolicy" : {
+        "ResourceSignal" : {
+          "Timeout" : "PT5M"
+        }
+      }
+    },
+
+    "NodeRedServerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP access via port 1880",
+        "SecurityGroupIngress" : [
+          {"IpProtocol" : "tcp", "FromPort" : "1880", "ToPort" : "1880", "CidrIp" : "0.0.0.0/0"},
+          {"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : { "Ref" : "SSHLocation"}}
+        ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "WebsiteURL" : {
+      "Description" : "URL for newly created Node-Red UI",
+      "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : [ "NodeRedServerInstance", "PublicDnsName" ]}, ":1880/ui"]] }
+    },
+    "SSH" : {
+      "Description" : "SSH login info",
+      "Value" : { "Fn::Join" : ["", ["ec2-user@", { "Fn::GetAtt" : [ "NodeRedServerInstance", "PublicDnsName" ]}]] }
+    }
+  }
+}

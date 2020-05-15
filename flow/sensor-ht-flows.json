@@ -1,0 +1,807 @@
+[
+    {
+        "id": "910832b7.c4be1",
+        "type": "tab",
+        "label": "sensor-ht-<MAC>",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "bdfadfba.d3c33",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "parse_temperature",
+        "func": "var connected = false;\nvar t = 0;\n\nif (context.temperature === undefined) {\n\t// set initial value\n    context.temperature = 0;\n}\n\nif (msg.topic === \"temperature-unit\") {\n    context.temperature_unit = (msg.payload === true) ? \"Fahrenheit\" : \"Celsius\";\n    t = context.temperature;\n} else {\n    // update temperature\n    if (msg.payload.state === undefined ||\n        msg.payload.state.reported === undefined ||\n        msg.payload.state.reported.temperature === undefined) {\n        t = context.temperature;\n    } else {\n        t = msg.payload.state.reported.temperature / 10;\n        context.temperature = t;\n    }\n}\n\nif (msg.payload.state === undefined ||\n    msg.payload.state.reported === undefined ||\n    msg.payload.state.reported.connected === undefined) {\n    connected = false;\n} else {\n    connected = msg.payload.state.reported.connected;\n}\n\nt = context.temperature;\nif (context.temperature_unit === \"Fahrenheit\") {\n\t// convert temperature : [°F] = [°C] × 9⁄5 + 32\n    t = ((t * 9) / 5) + 32;\n    t = Math.round(t * 100) / 100;\n\tmsg = {payload:t, topic:\"°F\", enabled: connected, ui_control:{min:32, max:212, seg1:59, seg2:97}};\n} else {\n\tmsg = {payload:t, topic:\"°C\", enabled: connected, ui_control:{min:0, max:100, seg1:15, seg2:36}};\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1030,
+        "y": 120,
+        "wires": [
+            [
+                "18fa56b5.f3d099"
+            ]
+        ]
+    },
+    {
+        "id": "ff86cd73.729ce",
+        "type": "inject",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "topic": "",
+        "payload": "{\"state\":{\"reported\":{\"humidity\":74,\"temperature\":218}},\"clientToken\":\"063762\"}",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 410,
+        "y": 100,
+        "wires": [
+            [
+                "1bbe8d9d.3f1782"
+            ]
+        ]
+    },
+    {
+        "id": "18fa56b5.f3d099",
+        "type": "ui_gauge",
+        "z": "910832b7.c4be1",
+        "name": "gauge_temperature",
+        "group": "72b37ab3.e6f494",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Temperature",
+        "label": "",
+        "format": "{{value}}{{topic}}",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#ffff00",
+            "#00ff00",
+            "#ca3838"
+        ],
+        "seg1": "15",
+        "seg2": "36",
+        "x": 1270,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "258d4986.bdb6a6",
+        "type": "ui_switch",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "label": "Units: Celsius / Fahrenheit",
+        "tooltip": "",
+        "group": "72b37ab3.e6f494",
+        "order": 4,
+        "width": 0,
+        "height": 0,
+        "passthru": true,
+        "decouple": "false",
+        "topic": "temperature-unit",
+        "style": "",
+        "onvalue": "true",
+        "onvalueType": "bool",
+        "onicon": "",
+        "oncolor": "",
+        "offvalue": "false",
+        "offvalueType": "bool",
+        "officon": "",
+        "offcolor": "",
+        "x": 1060,
+        "y": 180,
+        "wires": [
+            [
+                "bdfadfba.d3c33"
+            ]
+        ]
+    },
+    {
+        "id": "66cc4cb8.0fce14",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "parse_humidity",
+        "func": "// update humidity\nvar connected = false;\nvar humidity = 0;\n\nif (context.humidity === undefined) {\n    context.humidity = 0;\n}\n\nif (msg.payload.state.reported.humidity === undefined) {\n    humidity = context.humidity;\n} else {\n    humidity = msg.payload.state.reported.humidity;\n    context.humidity = humidity;\n}\n\nif (msg.payload.state.reported.connected === undefined) {\n    connected = false;\n} else {\n    connected = msg.payload.state.reported.connected;\n}\nmsg = {payload: humidity, enabled: connected};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1020,
+        "y": 280,
+        "wires": [
+            [
+                "dc2b233e.f7e44"
+            ]
+        ]
+    },
+    {
+        "id": "dc2b233e.f7e44",
+        "type": "ui_gauge",
+        "z": "910832b7.c4be1",
+        "name": "gauge_humidity",
+        "group": "72b37ab3.e6f494",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Humidity",
+        "label": "",
+        "format": "{{value}}%",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#ffff80",
+            "#00ff00",
+            "#ca3838"
+        ],
+        "seg1": "40",
+        "seg2": "60",
+        "x": 1220,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "9b8af67.b582a08",
+        "type": "aws-mqtt in",
+        "z": "910832b7.c4be1",
+        "device": "2a8e5a11.d49ba6",
+        "topic": "$aws/things/sensor-ht-<MAC>/shadow/#",
+        "x": 130,
+        "y": 140,
+        "wires": [
+            [
+                "3ccc92be.79b58e"
+            ]
+        ]
+    },
+    {
+        "id": "1bbe8d9d.3f1782",
+        "type": "json",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 610,
+        "y": 220,
+        "wires": [
+            [
+                "923b38ed.861948",
+                "8fe7d7a.4b7d928"
+            ]
+        ]
+    },
+    {
+        "id": "85ab332f.d4867",
+        "type": "ui_numeric",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "label": "Interval (s)",
+        "tooltip": "",
+        "group": "72b37ab3.e6f494",
+        "order": 5,
+        "width": "4",
+        "height": "1",
+        "wrap": false,
+        "passthru": true,
+        "topic": "",
+        "format": "{{value}}",
+        "min": "10",
+        "max": "3600",
+        "step": "10",
+        "x": 350,
+        "y": 520,
+        "wires": [
+            [
+                "4b5a570c.72db38",
+                "2c5f7844.4815e8"
+            ]
+        ]
+    },
+    {
+        "id": "9d014206.8c65f",
+        "type": "ui_button",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "group": "72b37ab3.e6f494",
+        "order": 6,
+        "width": "2",
+        "height": "1",
+        "passthru": false,
+        "label": "update",
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "icon": "",
+        "payload": "X",
+        "payloadType": "str",
+        "topic": "",
+        "x": 590,
+        "y": 580,
+        "wires": [
+            [
+                "4b5a570c.72db38"
+            ]
+        ]
+    },
+    {
+        "id": "53846897.08a728",
+        "type": "inject",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "topic": "",
+        "payload": "Started!",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "",
+        "x": 120,
+        "y": 580,
+        "wires": [
+            [
+                "4b5a570c.72db38",
+                "597b0907.2554f8"
+            ]
+        ]
+    },
+    {
+        "id": "4b5a570c.72db38",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "interval_changed",
+        "func": "var interval = context.get(\"INTERVAL\") || 0;\n\nif (msg.payload === \"Started!\") {\n    msg.enabled = false;\n    msg.topic = \"Z\";\n    return msg\n}\n\nif (msg.payload === \"X\") {\n    msg.enabled = false;\n    msg.topic = \"X\";\n    var token = Math.floor(Math.random() * 1000000);\n    msg.payload = \"{\\\"state\\\":{\\\"desired\\\":{\\\"interval\\\":\" + (interval * 1000) + \"}},\\\"clientToken\\\":\\\"\" + token + \"\\\"}\"\n    return msg\n}\n\nif (msg.topic == \"P\" ) {\n    msg.enabled = false;\n    context.set(\"INTERVAL\", msg.payload);\n    return msg;\n}\nmsg.enabled = true;\ncontext.set(\"INTERVAL\", msg.payload);\nmsg.topic = \"Y\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 370,
+        "y": 580,
+        "wires": [
+            [
+                "9d014206.8c65f",
+                "1db28e0b.bbc942"
+            ]
+        ]
+    },
+    {
+        "id": "1db28e0b.bbc942",
+        "type": "switch",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "property": "topic",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "X",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 590,
+        "y": 640,
+        "wires": [
+            [
+                "a399e2.73ea762"
+            ]
+        ]
+    },
+    {
+        "id": "529ad809.91ba18",
+        "type": "debug",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 890,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "92adddbb.78aa9",
+        "type": "aws-mqtt out",
+        "z": "910832b7.c4be1",
+        "device": "2a8e5a11.d49ba6",
+        "topic": "$aws/things/sensor-ht-<MAC>/shadow/update",
+        "qos": "0",
+        "x": 910,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "62b47b45.a38914",
+        "type": "inject",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "topic": "",
+        "payload": "{\"state\":{\"desired\":{\"interval\":20000}},\"clientToken\":\"157570\"}",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 570,
+        "y": 720,
+        "wires": [
+            [
+                "92adddbb.78aa9",
+                "529ad809.91ba18"
+            ]
+        ]
+    },
+    {
+        "id": "a399e2.73ea762",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "func": "return {payload: msg.payload};",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 710,
+        "y": 640,
+        "wires": [
+            [
+                "92adddbb.78aa9",
+                "529ad809.91ba18"
+            ]
+        ]
+    },
+    {
+        "id": "3ccc92be.79b58e",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "shadow-event-parser",
+        "func": "var tokens = msg.topic.split(\"/\");\n\nif (tokens.length < 5 || tokens.length > 6) {\n    // invalid aws shadow topic element size\n    return null;\n}\n\nif (tokens[0] !== \"$aws\" && tokens[1] !== \"things\" && tokens[3] !== \"shadow\") {\n    // invalid aws shadow topic\n    return null;\n}\n\nvar thingName = tokens[2];\nvar shadowCommand = tokens[4];\nif (tokens.length == 6) {\n    shadowCommand = shadowCommand + \"/\" + tokens[5];\n}\n\nmsg.command = shadowCommand;\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 200,
+        "y": 200,
+        "wires": [
+            [
+                "c5a38dbe.4f714"
+            ]
+        ]
+    },
+    {
+        "id": "26659834.eeb508",
+        "type": "inject",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "topic": "$aws/things/sensor-ht-<MAC>/shadow/get/accepted",
+        "payload": "{\"state\":{\"desired\":{\"interval\":20000},\"reported\":{\"interval\":20000,\"humidity\":74,\"temperature\":218}},\"metadata\":{\"desired\":{\"interval\":{\"timestamp\":1576116299}},\"reported\":{\"interval\":{\"timestamp\":1576047433},\"humidity\":{\"timestamp\":1576054069},\"temperature\":{\"timestamp\":1576054069}}},\"version\":198,\"timestamp\":1576116806}",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 90,
+        "y": 320,
+        "wires": [
+            [
+                "3ccc92be.79b58e"
+            ]
+        ]
+    },
+    {
+        "id": "c5a38dbe.4f714",
+        "type": "switch",
+        "z": "910832b7.c4be1",
+        "name": "aws-shadow-event-dispatcher",
+        "property": "command",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "update",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "get/accepted",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 310,
+        "y": 260,
+        "wires": [
+            [
+                "1bbe8d9d.3f1782"
+            ],
+            [
+                "a9751e51.cec7"
+            ]
+        ]
+    },
+    {
+        "id": "823304c4.688e28",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "receive aws shadow event",
+        "info": "",
+        "x": 130,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "9d78c5b6.336578",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "parse 'update' data",
+        "info": "",
+        "x": 610,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "739ea4da.3735ac",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "show temperature to gauge_ui",
+        "info": "",
+        "x": 1060,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "568c0771.7d96d8",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "show humidity to gauge_ui",
+        "info": "",
+        "x": 1050,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "d74547e4.d8a858",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "parse_interval",
+        "func": "// update interval value\nvar interval = msg.payload.state.reported.interval;\n// units = second;\nmsg.payload = Math.round(interval / 1000);\nmsg.topic = \"P\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1020,
+        "y": 460,
+        "wires": [
+            [
+                "85ab332f.d4867"
+            ]
+        ]
+    },
+    {
+        "id": "a9751e51.cec7",
+        "type": "json",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 610,
+        "y": 400,
+        "wires": [
+            [
+                "923b38ed.861948",
+                "8cdaee2c.b2f2c"
+            ]
+        ]
+    },
+    {
+        "id": "4d7d8c67.4e5834",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "parse 'get' data",
+        "info": "",
+        "x": 600,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "512c2d6a.f86e64",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "configure device polling interval",
+        "info": "",
+        "x": 310,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "8eda4125.8901e",
+        "type": "aws-mqtt out",
+        "z": "910832b7.c4be1",
+        "device": "2a8e5a11.d49ba6",
+        "topic": "$aws/things/sensor-ht-<MAC>/shadow/get",
+        "qos": 0,
+        "x": 510,
+        "y": 860,
+        "wires": []
+    },
+    {
+        "id": "549e4d17.7bfeb4",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "send request to get last shadow",
+        "info": "",
+        "x": 350,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "597b0907.2554f8",
+        "type": "function",
+        "z": "910832b7.c4be1",
+        "name": "get_shadow",
+        "func": "msg.payload = null;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 290,
+        "y": 860,
+        "wires": [
+            [
+                "8eda4125.8901e"
+            ]
+        ]
+    },
+    {
+        "id": "2c5f7844.4815e8",
+        "type": "debug",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 610,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "c2d84170.353d2",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "send update interval request to aws",
+        "info": "",
+        "x": 920,
+        "y": 780,
+        "wires": []
+    },
+    {
+        "id": "266f2192.aa706e",
+        "type": "comment",
+        "z": "910832b7.c4be1",
+        "name": "get interval from 'update' / 'get' data",
+        "info": "",
+        "x": 1080,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "923b38ed.861948",
+        "type": "switch",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(payload.state.reported.temperature)",
+                "vt": "jsonata"
+            },
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(payload.state.reported.humidity)",
+                "vt": "jsonata"
+            },
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(payload.state.reported.interval)",
+                "vt": "jsonata"
+            },
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(\t   payload.state.reported.connected\t) and $not(\t   $exists(\t       payload.state.reported.temperature\t   )\t) and $not(\t   $exists(\t       payload.state.reported.humidity\t   )\t)",
+                "vt": "jsonata"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 4,
+        "x": 790,
+        "y": 280,
+        "wires": [
+            [
+                "bdfadfba.d3c33"
+            ],
+            [
+                "66cc4cb8.0fce14"
+            ],
+            [
+                "d74547e4.d8a858"
+            ],
+            [
+                "bdfadfba.d3c33",
+                "66cc4cb8.0fce14"
+            ]
+        ]
+    },
+    {
+        "id": "8fe7d7a.4b7d928",
+        "type": "debug",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 780,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "8cdaee2c.b2f2c",
+        "type": "debug",
+        "z": "910832b7.c4be1",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 780,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "2c8ed8b9.e56158",
+        "type": "ui_text",
+        "z": "910832b7.c4be1",
+        "group": "72b37ab3.e6f494",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Humidity & Temperature sensor (Si7021)",
+        "format": "{{msg.payload}}",
+        "layout": "col-center",
+        "x": 680,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "72b37ab3.e6f494",
+        "type": "ui_group",
+        "z": "",
+        "name": "sensor-ht-<MAC>",
+        "tab": "fbc52024.06b82",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": true
+    },
+    {
+        "id": "2a8e5a11.d49ba6",
+        "type": "aws-iot-device",
+        "z": "",
+        "name": "sensor-ht-<MAC>",
+        "mode": "broker",
+        "clientId": "app-sensor-ht-<MAC>",
+        "endpoint": "<ENDPOINT>",
+        "awscerts": "/home/<USER>/.node-red/certs"
+    },
+    {
+        "id": "fbc52024.06b82",
+        "type": "ui_tab",
+        "z": "",
+        "name": "AWS Iot Sensor Demo",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "e238620b.5c673",
+        "type": "ui_base",
+        "theme": {
+            "name": "theme-light",
+            "lightTheme": {
+                "default": "#0094CE",
+                "baseColor": "#0094CE",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": true,
+                "reset": false
+            },
+            "darkTheme": {
+                "default": "#097479",
+                "baseColor": "#097479",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": false
+            },
+            "customTheme": {
+                "name": "Untitled Theme 1",
+                "default": "#4B7930",
+                "baseColor": "#4B7930",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+            },
+            "themeState": {
+                "base-color": {
+                    "default": "#0094CE",
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-titlebar-backgroundColor": {
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-backgroundColor": {
+                    "value": "#fafafa",
+                    "edited": false
+                },
+                "page-sidebar-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-textColor": {
+                    "value": "#1bbfff",
+                    "edited": false
+                },
+                "group-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "widget-textColor": {
+                    "value": "#111111",
+                    "edited": false
+                },
+                "widget-backgroundColor": {
+                    "value": "#0094ce",
+                    "edited": false
+                },
+                "widget-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "base-font": {
+                    "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+                }
+            },
+            "angularTheme": {
+                "primary": "indigo",
+                "accents": "blue",
+                "warn": "red",
+                "background": "grey"
+            }
+        },
+        "site": {
+            "name": "Node-RED Dashboard",
+            "hideToolbar": "false",
+            "allowSwipe": "false",
+            "lockMenu": "false",
+            "allowTempTheme": "true",
+            "dateFormat": "DD/MM/YYYY",
+            "sizes": {
+                "sx": 48,
+                "sy": 48,
+                "gx": 6,
+                "gy": 6,
+                "cx": 6,
+                "cy": 6,
+                "px": 0,
+                "py": 0
+            }
+        }
+    }
+]

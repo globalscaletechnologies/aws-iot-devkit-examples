@@ -1,0 +1,716 @@
+[
+    {
+        "id": "fd61663a.1ccb88",
+        "type": "tab",
+        "label": "sensor-lu-<MAC>",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "c156211e.fcd8c",
+        "type": "inject",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "topic": "",
+        "payload": "{\"state\":{\"reported\":{\"humidity\":74,\"temperature\":218}},\"clientToken\":\"063762\"}",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 510,
+        "y": 120,
+        "wires": [
+            [
+                "5f753efc.0be97"
+            ]
+        ]
+    },
+    {
+        "id": "3dfc3d47.e41bb2",
+        "type": "function",
+        "z": "fd61663a.1ccb88",
+        "name": "parse_lux",
+        "func": "// update lux\nvar connected = false;\nvar lux = 0;\n\nif (context.lux === undefined) {\n    context.lux = 0;\n}\n\nif (msg.payload.state.reported.lux === undefined) {\n    lux = context.lux;\n} else {\n    lux = msg.payload.state.reported.lux / 10;\n    context.lux = lux;\n}\n\nif (msg.payload.state.reported.connected === undefined) {\n    connected = false;\n} else {\n    connected = msg.payload.state.reported.connected;\n}\n\nmsg = {payload: lux, enabled: connected};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1120,
+        "y": 300,
+        "wires": [
+            [
+                "aa7ae0dc.dd7f8"
+            ]
+        ]
+    },
+    {
+        "id": "aa7ae0dc.dd7f8",
+        "type": "ui_gauge",
+        "z": "fd61663a.1ccb88",
+        "name": "gauge_lux",
+        "group": "e1ecc8cc.3f6698",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "gtype": "gage",
+        "title": "Lumen",
+        "label": "",
+        "format": "{{value}} lux",
+        "min": 0,
+        "max": "1500",
+        "colors": [
+            "#808080",
+            "#ffff00",
+            "#ca3838"
+        ],
+        "seg1": "60",
+        "seg2": "400",
+        "x": 1310,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "88ba603e.f1323",
+        "type": "aws-mqtt in",
+        "z": "fd61663a.1ccb88",
+        "device": "9b7710f1.fcdb5",
+        "topic": "$aws/things/sensor-lu-<MAC>/shadow/#",
+        "x": 230,
+        "y": 160,
+        "wires": [
+            [
+                "f4f9f96a.d5c0a8"
+            ]
+        ]
+    },
+    {
+        "id": "5f753efc.0be97",
+        "type": "json",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 710,
+        "y": 240,
+        "wires": [
+            [
+                "b3dc718d.68008",
+                "2e828a96.6b6ca6"
+            ]
+        ]
+    },
+    {
+        "id": "838286a9.17e4a8",
+        "type": "ui_numeric",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "label": "Interval (s)",
+        "tooltip": "",
+        "group": "e1ecc8cc.3f6698",
+        "order": 3,
+        "width": "4",
+        "height": "1",
+        "wrap": false,
+        "passthru": true,
+        "topic": "",
+        "format": "{{value}}",
+        "min": "10",
+        "max": "3600",
+        "step": "10",
+        "x": 450,
+        "y": 540,
+        "wires": [
+            [
+                "c2103474.729918",
+                "3278f8ea.827958"
+            ]
+        ]
+    },
+    {
+        "id": "ce6e9825.642db8",
+        "type": "ui_button",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "group": "e1ecc8cc.3f6698",
+        "order": 4,
+        "width": "2",
+        "height": "1",
+        "passthru": false,
+        "label": "update",
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "icon": "",
+        "payload": "X",
+        "payloadType": "str",
+        "topic": "",
+        "x": 690,
+        "y": 600,
+        "wires": [
+            [
+                "c2103474.729918"
+            ]
+        ]
+    },
+    {
+        "id": "366484f7.db14ec",
+        "type": "inject",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "topic": "",
+        "payload": "Started!",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "",
+        "x": 220,
+        "y": 600,
+        "wires": [
+            [
+                "c2103474.729918",
+                "6023cae7.8a3704"
+            ]
+        ]
+    },
+    {
+        "id": "c2103474.729918",
+        "type": "function",
+        "z": "fd61663a.1ccb88",
+        "name": "interval_changed",
+        "func": "var interval = context.get(\"INTERVAL\") || 0;\n\nif (msg.payload === \"Started!\") {\n    msg.enabled = false;\n    msg.topic = \"Z\";\n    return msg\n}\n\nif (msg.payload === \"X\") {\n    msg.enabled = false;\n    msg.topic = \"X\";\n    var token = Math.floor(Math.random() * 1000000);\n    msg.payload = \"{\\\"state\\\":{\\\"desired\\\":{\\\"interval\\\":\" + (interval * 1000) + \"}},\\\"clientToken\\\":\\\"\" + token + \"\\\"}\"\n    return msg\n}\n\nif (msg.topic == \"P\" ) {\n    msg.enabled = false;\n    context.set(\"INTERVAL\", msg.payload);\n    return msg;\n}\nmsg.enabled = true;\ncontext.set(\"INTERVAL\", msg.payload);\nmsg.topic = \"Y\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 470,
+        "y": 600,
+        "wires": [
+            [
+                "ce6e9825.642db8",
+                "c7864668.1d9388"
+            ]
+        ]
+    },
+    {
+        "id": "c7864668.1d9388",
+        "type": "switch",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "property": "topic",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "X",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 690,
+        "y": 660,
+        "wires": [
+            [
+                "608c827d.3fe11c"
+            ]
+        ]
+    },
+    {
+        "id": "16295a28.682c36",
+        "type": "debug",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 990,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "7fcc9d5d.4806f4",
+        "type": "aws-mqtt out",
+        "z": "fd61663a.1ccb88",
+        "device": "9b7710f1.fcdb5",
+        "topic": "$aws/things/sensor-lu-<MAC>/shadow/update",
+        "qos": "0",
+        "x": 1010,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "21100692.cad9fa",
+        "type": "inject",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "topic": "",
+        "payload": "{\"state\":{\"desired\":{\"interval\":20000}},\"clientToken\":\"157570\"}",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 670,
+        "y": 740,
+        "wires": [
+            [
+                "7fcc9d5d.4806f4",
+                "16295a28.682c36"
+            ]
+        ]
+    },
+    {
+        "id": "608c827d.3fe11c",
+        "type": "function",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "func": "return {payload: msg.payload};",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 810,
+        "y": 660,
+        "wires": [
+            [
+                "7fcc9d5d.4806f4",
+                "16295a28.682c36"
+            ]
+        ]
+    },
+    {
+        "id": "f4f9f96a.d5c0a8",
+        "type": "function",
+        "z": "fd61663a.1ccb88",
+        "name": "shadow-event-parser",
+        "func": "var tokens = msg.topic.split(\"/\");\n\nif (tokens.length < 5 || tokens.length > 6) {\n    // invalid aws shadow topic element size\n    return null;\n}\n\nif (tokens[0] !== \"$aws\" && tokens[1] !== \"things\" && tokens[3] !== \"shadow\") {\n    // invalid aws shadow topic\n    return null;\n}\n\nvar thingName = tokens[2];\nvar shadowCommand = tokens[4];\nif (tokens.length == 6) {\n    shadowCommand = shadowCommand + \"/\" + tokens[5];\n}\n\nmsg.command = shadowCommand;\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 300,
+        "y": 220,
+        "wires": [
+            [
+                "cc0e6291.2ee1c"
+            ]
+        ]
+    },
+    {
+        "id": "708aa1ca.8e971",
+        "type": "inject",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "topic": "$aws/things/sensor-ht-<MAC>/shadow/get/accepted",
+        "payload": "{\"state\":{\"desired\":{\"interval\":20000},\"reported\":{\"interval\":20000,\"humidity\":74,\"temperature\":218}},\"metadata\":{\"desired\":{\"interval\":{\"timestamp\":1576116299}},\"reported\":{\"interval\":{\"timestamp\":1576047433},\"humidity\":{\"timestamp\":1576054069},\"temperature\":{\"timestamp\":1576054069}}},\"version\":198,\"timestamp\":1576116806}",
+        "payloadType": "str",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "x": 190,
+        "y": 340,
+        "wires": [
+            [
+                "f4f9f96a.d5c0a8"
+            ]
+        ]
+    },
+    {
+        "id": "cc0e6291.2ee1c",
+        "type": "switch",
+        "z": "fd61663a.1ccb88",
+        "name": "aws-shadow-event-dispatcher",
+        "property": "command",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "update",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "get/accepted",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 410,
+        "y": 280,
+        "wires": [
+            [
+                "5f753efc.0be97"
+            ],
+            [
+                "dedf9900.9b79e8"
+            ]
+        ]
+    },
+    {
+        "id": "6f9d33a6.c3bfdc",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "receive aws shadow event",
+        "info": "",
+        "x": 230,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "32788924.a49af6",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "parse 'update' data",
+        "info": "",
+        "x": 710,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "38f28854.caf768",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "show lux to gauge_ui",
+        "info": "",
+        "x": 1140,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "661012fd.6cc4ac",
+        "type": "function",
+        "z": "fd61663a.1ccb88",
+        "name": "parse_interval",
+        "func": "// update interval value\nvar interval = msg.payload.state.reported.interval;\n// units = second;\nmsg.payload = Math.round(interval / 1000);\nmsg.topic = \"P\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1120,
+        "y": 480,
+        "wires": [
+            [
+                "838286a9.17e4a8"
+            ]
+        ]
+    },
+    {
+        "id": "dedf9900.9b79e8",
+        "type": "json",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 710,
+        "y": 420,
+        "wires": [
+            [
+                "b3dc718d.68008",
+                "9417d212.feb78"
+            ]
+        ]
+    },
+    {
+        "id": "3059c911.fbe3a6",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "parse 'get' data",
+        "info": "",
+        "x": 700,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "241cbb96.111cd4",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "configure device polling interval",
+        "info": "",
+        "x": 410,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "35d78643.f0264a",
+        "type": "aws-mqtt out",
+        "z": "fd61663a.1ccb88",
+        "device": "9b7710f1.fcdb5",
+        "topic": "$aws/things/sensor-lu-<MAC>/shadow/get",
+        "qos": 0,
+        "x": 610,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "2681686f.6e3938",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "send request to get last shadow",
+        "info": "",
+        "x": 450,
+        "y": 820,
+        "wires": []
+    },
+    {
+        "id": "6023cae7.8a3704",
+        "type": "function",
+        "z": "fd61663a.1ccb88",
+        "name": "get_shadow",
+        "func": "msg.payload = null;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 390,
+        "y": 880,
+        "wires": [
+            [
+                "35d78643.f0264a"
+            ]
+        ]
+    },
+    {
+        "id": "3278f8ea.827958",
+        "type": "debug",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 710,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "a2c39be1.8e3df8",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "send update interval request to aws",
+        "info": "",
+        "x": 1020,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "d7923e8e.7a99a",
+        "type": "comment",
+        "z": "fd61663a.1ccb88",
+        "name": "get interval from 'update' / 'get' data",
+        "info": "",
+        "x": 1180,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "b3dc718d.68008",
+        "type": "switch",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(payload.state.reported.lux)",
+                "vt": "jsonata"
+            },
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(\t   payload.state.reported.connected\t) and $not(\t   $exists(payload.state.reported.lux)\t)",
+                "vt": "jsonata"
+            },
+            {
+                "t": "jsonata_exp",
+                "v": "$exists(payload.state.reported.interval)",
+                "vt": "jsonata"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 3,
+        "x": 890,
+        "y": 300,
+        "wires": [
+            [
+                "3dfc3d47.e41bb2"
+            ],
+            [
+                "3dfc3d47.e41bb2"
+            ],
+            [
+                "661012fd.6cc4ac"
+            ]
+        ]
+    },
+    {
+        "id": "2e828a96.6b6ca6",
+        "type": "debug",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 880,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "9417d212.feb78",
+        "type": "debug",
+        "z": "fd61663a.1ccb88",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 880,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "9dd2bcfa.a78f38",
+        "type": "ui_text",
+        "z": "fd61663a.1ccb88",
+        "group": "e1ecc8cc.3f6698",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Ambient Light sensor (APDS-9301)",
+        "format": "{{msg.payload}}",
+        "layout": "col-center",
+        "x": 560,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "e1ecc8cc.3f6698",
+        "type": "ui_group",
+        "z": "",
+        "name": "sensor-lu-<MAC>",
+        "tab": "fbc52024.06b82",
+        "order": 2,
+        "disp": true,
+        "width": "6",
+        "collapse": true
+    },
+    {
+        "id": "9b7710f1.fcdb5",
+        "type": "aws-iot-device",
+        "z": "",
+        "name": "sensor-lu-<MAC>",
+        "mode": "broker",
+        "clientId": "app-sensor-lu-<MAC>",
+        "endpoint": "<ENDPOINT>",
+        "awscerts": "/home/<USER>/.node-red/certs"
+    },
+    {
+        "id": "fbc52024.06b82",
+        "type": "ui_tab",
+        "z": "",
+        "name": "AWS Iot Sensor Demo",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "e238620b.5c673",
+        "type": "ui_base",
+        "theme": {
+            "name": "theme-light",
+            "lightTheme": {
+                "default": "#0094CE",
+                "baseColor": "#0094CE",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": true,
+                "reset": false
+            },
+            "darkTheme": {
+                "default": "#097479",
+                "baseColor": "#097479",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": false
+            },
+            "customTheme": {
+                "name": "Untitled Theme 1",
+                "default": "#4B7930",
+                "baseColor": "#4B7930",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+            },
+            "themeState": {
+                "base-color": {
+                    "default": "#0094CE",
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-titlebar-backgroundColor": {
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-backgroundColor": {
+                    "value": "#fafafa",
+                    "edited": false
+                },
+                "page-sidebar-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-textColor": {
+                    "value": "#1bbfff",
+                    "edited": false
+                },
+                "group-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "widget-textColor": {
+                    "value": "#111111",
+                    "edited": false
+                },
+                "widget-backgroundColor": {
+                    "value": "#0094ce",
+                    "edited": false
+                },
+                "widget-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "base-font": {
+                    "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+                }
+            },
+            "angularTheme": {
+                "primary": "indigo",
+                "accents": "blue",
+                "warn": "red",
+                "background": "grey"
+            }
+        },
+        "site": {
+            "name": "Node-RED Dashboard",
+            "hideToolbar": "false",
+            "allowSwipe": "false",
+            "lockMenu": "false",
+            "allowTempTheme": "true",
+            "dateFormat": "DD/MM/YYYY",
+            "sizes": {
+                "sx": 48,
+                "sy": 48,
+                "gx": 6,
+                "gy": 6,
+                "cx": 6,
+                "cy": 6,
+                "px": 0,
+                "py": 0
+            }
+        }
+    }
+]
