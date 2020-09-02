@@ -9,6 +9,8 @@ credential=0
 ssid=
 security=
 wifipw=
+ec2=0
+ec2server=
 output=./output
 
 usage() {
@@ -34,6 +36,9 @@ usage() {
     echo -e "\t\twpa : WPA"
     echo -e "\t\twpa2 : WPA2"
     echo -e "\t    password: WiFi password"
+    echo -e "\t-k | --keypair : path to exist certificate key file,"
+    echo -e "\t                 if provide this key, script will doesn't create ec2 server"
+    echo -e "\t-s | --sshserver : exist ssh server"
     echo -e ""
 }
 
@@ -89,12 +94,22 @@ do
             ;;
         esac
         ;;
+    -k|--keypair)
+        ec2=1
+        kpfile="${2}"
+        shift
+        ;;
+    -s|--sshserver)
+        ec2ssh="ec2-user@"${2}
+        ec2url="http://${2}:1880/ui"
+        shift
+        ;;
     -h|--help)
         usage
         exit
         ;;
     *)
-        echo "ERROR: unknown parameter"
+        echo "ERROR: unknown parameter : ${1}"
         exit 1
         ;;
     esac
@@ -119,10 +134,12 @@ fi
 # generate flows.json
 ./scripts/gen-sensor-flow.sh ${type} ${mac} ${endpoint} ${output}/flows.json
 
+if [ $ec2 -eq 0 ]; then
 # create ec2 key pair
-echo -e "generate ec2 key pair\n"
-aws ec2 create-key-pair --key-name ${EC2KP} --query 'KeyMaterial' --output text > ${output}/${EC2KP}.pem
-chmod 400 ${output}/${EC2KP}.pem
+    echo -e "generate ec2 key pair\n"
+    aws ec2 create-key-pair --key-name ${EC2KP} --query 'KeyMaterial' --output text > ${output}/${EC2KP}.pem
+    chmod 400 ${output}/${EC2KP}.pem
+fi
 
 # create IoT device key and certificate
 echo -e "generate IoT device key and certificate\n"
@@ -158,16 +175,16 @@ EOF
 # create aws-iot-thing-policies stack
 echo -e "create aws iot thing and policies stack\n"
 aws cloudformation create-stack \
-                    --stack-name aws-iot-thing-policies-stack \
+                    --stack-name aws-iot-thing-policies-${DSN} \
                     --template-body file://templates/aws-iot-thing-policies.template \
                     --parameters file://${output}/aws-iot-thing-policies-params.json \
                     --capabilities CAPABILITY_NAMED_IAM
 
 aws cloudformation wait stack-create-complete  \
-                        --stack-name aws-iot-thing-policies-stack
-
-# generate ec2-node-red server stack parameters
-cat << EOF > ${output}/aws-ec2-nodered-srv-params.json
+                        --stack-name aws-iot-thing-policies-${DSN}
+if [ $ec2 -eq 0 ]; then
+    # generate ec2-node-red server stack parameters
+    cat << EOF > ${output}/aws-ec2-nodered-srv-params.json
 [
   {
     "ParameterKey": "KeyName",
@@ -192,47 +209,70 @@ cat << EOF > ${output}/aws-ec2-nodered-srv-params.json
 ]
 EOF
 
-# create aws ec2 node-red server stack
-echo -e "create aws ec2 node-red server stack\n"
-aws cloudformation create-stack \
-                    --stack-name aws-ec2-nodered-stack \
-                    --template-body file://templates/aws-ec2-nodered-srv.template \
-                    --parameters file://${output}/aws-ec2-nodered-srv-params.json
+    # create aws ec2 node-red server stack
+    echo -e "create aws ec2 node-red server stack\n"
+    aws cloudformation create-stack \
+                        --stack-name aws-ec2-nodered-stack \
+                        --template-body file://templates/aws-ec2-nodered-srv.template \
+                        --parameters file://${output}/aws-ec2-nodered-srv-params.json
 
-aws cloudformation wait stack-create-complete  \
-                        --stack-name aws-ec2-nodered-stack
+    aws cloudformation wait stack-create-complete  \
+                            --stack-name aws-ec2-nodered-stack
 
-# get EC2 ssh info
-ec2url=$(aws cloudformation describe-stacks \
-                            --stack-name aws-ec2-nodered-stack \
-                            --query 'Stacks[0].Outputs[0].OutputValue' \
-                            --output text)
-ec2ssh=$(aws cloudformation describe-stacks \
-                            --stack-name aws-ec2-nodered-stack \
-                            --query 'Stacks[0].Outputs[1].OutputValue' \
-                            --output text)
+    # get EC2 ssh info
+    ec2url=$(aws cloudformation describe-stacks \
+                                --stack-name aws-ec2-nodered-stack \
+                                --query 'Stacks[0].Outputs[0].OutputValue' \
+                                --output text)
+    ec2ssh=$(aws cloudformation describe-stacks \
+                                --stack-name aws-ec2-nodered-stack \
+                                --query 'Stacks[0].Outputs[1].OutputValue' \
+                                --output text)
 
-# upload device key and certificate to ec2
-scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/root-CA.crt ${ec2ssh}:/home/ec2-user/.node-red/certs/root-CA.crt > /dev/null
-scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/sensor-${type}-${DSN}.cert.pem ${ec2ssh}:/home/ec2-user/.node-red/certs/app-sensor-${type}-${DSN}.cert.pem > /dev/null
-scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/sensor-${type}-${DSN}.private.key ${ec2ssh}:/home/ec2-user/.node-red/certs/app-sensor-${type}-${DSN}.private.key > /dev/null
+    # upload device key and certificate to ec2
+    scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/root-CA.crt ${ec2ssh}:/home/ec2-user/.node-red/certs/root-CA.crt > /dev/null
+    scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/sensor-${type}-${DSN}.cert.pem ${ec2ssh}:/home/ec2-user/.node-red/certs/app-sensor-${type}-${DSN}.cert.pem > /dev/null
+    scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/sensor-${type}-${DSN}.private.key ${ec2ssh}:/home/ec2-user/.node-red/certs/app-sensor-${type}-${DSN}.private.key > /dev/null
 
-# upload flows.json to ec2
-scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/flows.json ${ec2ssh}:/home/ec2-user/.node-red/flows.json > /dev/null
+    # upload flows.json to ec2
+    scp -o StrictHostKeyChecking=no -i ${output}/${EC2KP}.pem ${output}/flows.json ${ec2ssh}:/home/ec2-user/.node-red/flows.json > /dev/null
 
-# wait node-red service restart
-sleep 60
+    # wait node-red service restart
+    sleep 60
 
-echo -e "setup completed!\n"
-echo -e "Node-Red url: ${ec2url}\n"
-echo -e "EC2 ssh: ssh -i ${output}/${EC2KP}.pem ${ec2ssh}\n"
+    echo -e "setup completed!\n"
+    echo -e "Node-Red url: ${ec2url}\n"
+    echo -e "EC2 ssh: ssh -i ${output}/${EC2KP}.pem ${ec2ssh}\n"
 
-if [ ${credential} -gt 0 ]; then
-    ./scripts/cert2awsclientcredential.sh sensor-${type}-${DSN} ${ssid} ${security} ${wifipw}
+    if [ ${credential} -gt 0 ]; then
+        ./scripts/cert2awsclientcredential.sh sensor-${type}-${DSN} ${ssid} ${security} ${wifipw}
+        echo
+        echo -e "Amazon FreeRTOS credential files"
+        echo -e "  - ${output}/aws_clientcredential.h"
+        echo -e "  - ${output}/aws_clientcredential_keys.h"
+    fi
+else
+    # upload device key and certificate to ec2
+    scp -o StrictHostKeyChecking=no -i ${kpfile} ${output}/root-CA.crt ${ec2ssh}:/home/ec2-user/.node-red/certs/root-CA.crt > /dev/null
+    scp -o StrictHostKeyChecking=no -i ${kpfile} ${output}/sensor-${type}-${DSN}.cert.pem ${ec2ssh}:/home/ec2-user/.node-red/certs/app-sensor-${type}-${DSN}.cert.pem > /dev/null
+    scp -o StrictHostKeyChecking=no -i ${kpfile} ${output}/sensor-${type}-${DSN}.private.key ${ec2ssh}:/home/ec2-user/.node-red/certs/app-sensor-${type}-${DSN}.private.key > /dev/null
+
+    # upload flows.json to ec2
+    scp -o StrictHostKeyChecking=no -i ${kpfile} ${output}/flows.json ${ec2ssh}:/home/ec2-user/.node-red/flows-${type}-${DSN}.json > /dev/null
+
+    echo -e "setup completed!\n"
+    echo -e "Node-Red url: ${ec2url}\n"
+    echo -e "EC2 ssh: ssh -i ${kpfile} ${ec2ssh}\n"
     echo
-    echo -e "Amazon FreeRTOS credential files"
-    echo -e "  - ${output}/aws_clientcredential.h"
-    echo -e "  - ${output}/aws_clientcredential_keys.h"
+    echo -e "Please add ${output}/flows.json to Node-Red server manually\n"
+
+    if [ ${credential} -gt 0 ]; then
+        ./scripts/cert2awsclientcredential.sh sensor-${type}-${DSN} ${ssid} ${security} ${wifipw}
+        echo
+        echo -e "Amazon FreeRTOS credential files"
+        echo -e "  - ${output}/aws_clientcredential.h"
+        echo -e "  - ${output}/aws_clientcredential_keys.h"
+    fi
 fi
 
 exit 0
