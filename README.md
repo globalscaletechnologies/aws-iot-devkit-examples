@@ -59,6 +59,10 @@ Setup aws iot sensor demo environment
 	    	wpa : WPA
 	    	wpa2 : WPA2
 	    password: WiFi password
+	-k | --keypair : path to exist certificate key file,
+	                 if provide this key, script will doesn't create ec2 server
+	-s | --sshserver : exist ssh server
+
 
 Ex. $./setup-demo.sh \
        -t pt \
@@ -69,7 +73,7 @@ Ex. $./setup-demo.sh \
 ```
  - download amazon freertos source code from our [github](https://github.com/globalscaletechnologies/amazon-freertos)
 ```sh
-git clone https://github.com/globalscaletechnologies/amazon-freertos.git -b gti-iotkit-202002.00-r1
+git clone https://github.com/globalscaletechnologies/amazon-freertos.git -b gti-iotkit-202007.00-r1
 ```
  - modify the aws_demo_config.h file
 
